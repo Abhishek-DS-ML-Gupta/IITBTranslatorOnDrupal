@@ -49,7 +49,7 @@ class TranslateController {
       return new JsonResponse(["error" => "missing input"], 400);
     }
 
-    $apiKey = "bharatgen-iitb-token-wynmTmkZMNJbtYFfCoYMXmog3TQiaohxkCb2342sef";
+    $apiKey = "BHARATGEN-API-KEY";
 
     $targetLang = $this->normalizeLang($lang);
 
