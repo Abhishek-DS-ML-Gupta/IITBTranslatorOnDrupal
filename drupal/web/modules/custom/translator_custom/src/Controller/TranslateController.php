@@ -7,83 +7,106 @@ use Symfony\Component\HttpFoundation\Request;
 
 class TranslateController {
 
+  private function normalizeLang($lang) {
+
+    $map = [
+      "Hindi" => "Hindi",
+      "Marathi" => "Marathi",
+      "Bengali" => "Bengali",
+      "Tamil" => "Tamil",
+      "Telugu" => "Telugu",
+      "Gujarati" => "Gujarati",
+      "Punjabi" => "Punjabi",
+      "Kannada" => "Kannada",
+      "Malayalam" => "Malayalam",
+      "Odia" => "Odia",
+      "Assamese" => "Assamese",
+      "Urdu" => "Urdu",
+
+      // ⚠️ FIXED NAMES (IMPORTANT)
+      "Dogri" => "Dogri language (India)",
+      "Bodo" => "Bodo language (India)",
+      "Santali" => "Santali language (India)",
+      "Kashmiri" => "Kashmiri language",
+      "Manipuri" => "Meitei (Manipuri) language",
+      "Maithili" => "Maithili language",
+      "Sindhi" => "Sindhi language",
+      "Konkani" => "Konkani language",
+      "Nepali" => "Nepali language"
+    ];
+
+    return $map[$lang] ?? $lang;
+  }
+
   public function translate(Request $request) {
 
-    try {
+    $data = json_decode($request->getContent(), TRUE);
 
-      $data = json_decode($request->getContent(), TRUE);
+    $texts = $data['texts'] ?? [];
+    $lang  = $data['lang'] ?? '';
 
-      $texts = $data['texts'] ?? [];
-      $lang  = $data['lang'] ?? '';
-
-      if (empty($texts) || empty($lang)) {
-        return new JsonResponse([
-          "error" => "texts or lang missing"
-        ], 400);
-      }
-
-      $apiUrl = "https://api.bharatgen.dev/v1/chat/completions";
-
-      // ⚠️ API KEY (better move to env later)
-      $apiKey = "bharatgen-iitb-token-wynmTmkZMNJbtYFfCoYMXmog3TQiaohxkCb2342sef";
-
-      $prompt = "Translate into $lang ONLY. Do not explain.\n"
-              . implode("\n", $texts);
-
-      $payload = [
-        "model" => "param",
-        "temperature" => 0,
-        "max_tokens" => 1024,
-        "messages" => [
-          [
-            "role" => "system",
-            "content" => "You are a strict translation engine. Output ONLY translated text."
-          ],
-          [
-            "role" => "user",
-            "content" => $prompt
-          ]
-        ]
-      ];
-
-      $ch = curl_init($apiUrl);
-
-      curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => [
-          "Content-Type: application/json",
-          "Authorization: Bearer " . $apiKey
-        ],
-        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE)
-      ]);
-
-      $result = curl_exec($ch);
-
-      if (curl_errno($ch)) {
-        return new JsonResponse([
-          "error" => curl_error($ch)
-        ], 500);
-      }
-
-      curl_close($ch);
-
-      $json = json_decode($result, true);
-
-      $translated = $json['choices'][0]['message']['content'] ?? '';
-
-      // 🔥 IMPORTANT FIX: return clean UTF-8
-      return new JsonResponse([
-        "translations" => preg_split("/\r\n|\n|\r/", trim($translated))
-      ], 200, [
-        'Content-Type' => 'application/json; charset=UTF-8'
-      ]);
-
-    } catch (\Exception $e) {
-
-      return new JsonResponse([
-        "error" => $e->getMessage()
-      ], 500);
+    if (empty($texts) || empty($lang)) {
+      return new JsonResponse(["error" => "missing input"], 400);
     }
+
+    $apiKey = "bharatgen-iitb-token-wynmTmkZMNJbtYFfCoYMXmog3TQiaohxkCb2342sef";
+
+    $targetLang = $this->normalizeLang($lang);
+
+    // 🔥 STRONG PROMPT FOR LOW-RESOURCE LANGUAGES
+    $prompt =
+      "You are a professional translator.\n" .
+      "Translate EVERY line into: $targetLang\n" .
+      "Rules:\n" .
+      "- Never use English\n" .
+      "- Never skip lines\n" .
+      "- Keep same order\n" .
+      "- If language is rare (Dogri/Bodo/Odia), still translate or transliterate properly\n\n" .
+      implode("\n", $texts);
+
+    $payload = [
+      "model" => "param",
+      "temperature" => 0.1,
+      "max_tokens" => 2000,
+      "messages" => [
+        [
+          "role" => "system",
+          "content" => "You are a multilingual Indian language expert translator."
+        ],
+        [
+          "role" => "user",
+          "content" => $prompt
+        ]
+      ]
+    ];
+
+    $ch = curl_init("https://api.bharatgen.dev/v1/chat/completions");
+
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+      "Content-Type: application/json",
+      "Authorization: Bearer " . $apiKey
+    ]);
+
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $json = json_decode($response, true);
+
+    $translated = $json['choices'][0]['message']['content'] ?? '';
+
+    $lines = preg_split("/\r\n|\n|\r/", trim($translated));
+
+    $result = [];
+    foreach ($texts as $i => $t) {
+      $result[$i] = $lines[$i] ?? $t;
+    }
+
+    return new JsonResponse([
+      "translations" => $result
+    ]);
   }
 }
