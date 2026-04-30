@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
 
+  // 🌐 22 Indian Languages (UI ONLY - DO NOT TRANSLATE THIS)
   const LANG_MAP = {
     Hindi: "Hindi",
     Marathi: "Marathi",
@@ -25,30 +26,38 @@ document.addEventListener("DOMContentLoaded", () => {
     Nepali: "Nepali"
   };
 
-  // 🌐 Dropdown
+  // ==============================
+  // 🌐 CREATE DROPDOWN (FIXED UI)
+  // ==============================
   const dropdown = document.createElement("select");
   dropdown.id = "lang";
 
   dropdown.style.position = "fixed";
   dropdown.style.top = "15px";
   dropdown.style.right = "20px";
-  dropdown.style.zIndex = "99999";
-  dropdown.style.padding = "8px";
+  dropdown.style.zIndex = "999999";
+  dropdown.style.padding = "10px";
+  dropdown.style.borderRadius = "8px";
+  dropdown.style.background = "#111";
+  dropdown.style.color = "#fff";
 
-  dropdown.innerHTML = `
-    <option value="">🌐 Select Language</option>
-    ${Object.keys(LANG_MAP).map(l => `<option value="${l}">${l}</option>`).join("")}
-  `;
+  dropdown.innerHTML =
+    `<option value="">🌐 Select Language</option>` +
+    Object.keys(LANG_MAP)
+      .map(lang => `<option value="${lang}">${lang}</option>`)
+      .join("");
 
   document.body.appendChild(dropdown);
 
-  // 🚫 Get FULL PAGE text nodes (fresh scan every time)
+  // ==============================
+  // 🔍 GET TEXT NODES (SAFE)
+  // ==============================
   function getTextNodes() {
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
       {
-        acceptNode: function(node) {
+        acceptNode(node) {
 
           const text = node.nodeValue.trim();
           if (!text) return NodeFilter.FILTER_REJECT;
@@ -58,14 +67,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const tag = parent.tagName;
 
-          // ❌ Skip UI elements
+          // ❌ ignore UI + scripts
           if (
             ["SCRIPT","STYLE","NOSCRIPT","SELECT","OPTION","INPUT","TEXTAREA","BUTTON"].includes(tag)
           ) {
             return NodeFilter.FILTER_REJECT;
           }
 
-          // ❌ Skip dropdown itself
+          // ❌ NEVER translate dropdown
           if (parent.closest("#lang")) {
             return NodeFilter.FILTER_REJECT;
           }
@@ -75,46 +84,62 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     );
 
-    let nodes = [];
-    let node;
-    while ((node = walker.nextNode())) {
-      nodes.push(node);
+    const nodes = [];
+    let n;
+    while (n = walker.nextNode()) {
+      nodes.push(n);
     }
     return nodes;
   }
 
-  // 🚀 FULL PAGE TRANSLATION ON CHANGE
+  // ==============================
+  // 🚀 TRANSLATION HANDLER
+  // ==============================
   dropdown.addEventListener("change", async (e) => {
 
     const lang = e.target.value;
     if (!lang) return;
 
-    // 🔥 IMPORTANT: fresh scan every click (FULL PAGE FIX)
-    let textNodes = getTextNodes();
-    let texts = textNodes.map(n => n.nodeValue);
+    const textNodes = getTextNodes();
+    const texts = textNodes.map(n => n.nodeValue);
 
     try {
+
       const res = await fetch("/api/translator", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
-          texts,
-          lang
+          texts: texts,
+          lang: lang
         })
       });
 
       const data = await res.json();
 
-      if (data.translations) {
+      // ==============================
+      // ⚡ SAFE APPLY (NO CRASH)
+      // ==============================
+      if (data && data.translations && Array.isArray(data.translations)) {
+
         textNodes.forEach((node, i) => {
+
+          // fallback protection
           if (data.translations[i]) {
             node.nodeValue = data.translations[i];
           }
+
         });
+
+      } else {
+        console.error("Invalid translation response:", data);
+        alert("Translation failed for selected language.");
       }
 
     } catch (err) {
       console.error("Translation Error:", err);
+      alert("API error occurred.");
     }
 
   });
