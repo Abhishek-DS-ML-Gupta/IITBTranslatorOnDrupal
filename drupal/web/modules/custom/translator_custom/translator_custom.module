@@ -1,0 +1,5 @@
+<?php
+
+function translator_custom_page_attachments(array &$attachments) {
+  $attachments['#attached']['library'][] = 'translator_custom/global-translator';
+}

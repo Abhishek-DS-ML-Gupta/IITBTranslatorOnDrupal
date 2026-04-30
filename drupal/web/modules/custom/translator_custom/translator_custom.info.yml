@@ -1,0 +1,5 @@
+name: Translator Custom
+type: module
+description: BharatGen Translation Integration
+core_version_requirement: ^10
+package: Custom

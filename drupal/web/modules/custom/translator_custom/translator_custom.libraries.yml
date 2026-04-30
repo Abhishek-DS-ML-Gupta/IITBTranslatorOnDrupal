@@ -1,0 +1,5 @@
+global-translator:
+  js:
+    js/translator.js: {}
+  dependencies:
+    - core/drupal

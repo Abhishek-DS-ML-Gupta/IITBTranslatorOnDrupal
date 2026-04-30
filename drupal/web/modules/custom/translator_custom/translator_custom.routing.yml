@@ -1,0 +1,8 @@
+translator_custom.translate:
+  path: '/api/translator'
+  defaults:
+    _controller: '\Drupal\translator_custom\Controller\TranslateController::translate'
+    _format: 'json'
+  methods: ['POST']
+  requirements:
+    _permission: 'access content'
